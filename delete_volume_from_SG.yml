@@ -1,0 +1,74 @@
+---
+- name: delete volume
+  hosts: localhost
+  connection: local
+
+  vars:
+    unispherehost: "10.241.210.217"
+    universion: "90"
+    user: "smc"
+    password: "smc"
+    serial_no: "000197600361"
+    sg_name: "GK_sg"
+    verifycert: false
+
+  tasks:
+  - name: Get details of the storage group
+    dellemc_powermax_storagegroup:
+      unispherehost: "{{unispherehost}}"
+      universion: "{{universion}}"
+      verifycert: "{{verifycert}}"
+      user: "{{user}}"
+      password: "{{password}}"
+      serial_no: "{{serial_no}}"
+      sg_name: "{{sg_name}}"
+      state: "present"
+    register: storage_details
+  
+  - set_fact:
+      all_volumes_Id : "{{storage_details.storage_group_volumes | list}}"
+
+  - name : remove volumes from storage group
+    dellemc_powermax_storagegroup:
+      unispherehost: "{{unispherehost}}"
+      universion: "{{universion}}"
+      verifycert: "{{verifycert}}"
+      user: "{{user}}"
+      password: "{{password}}"
+      serial_no: "{{serial_no}}"
+      sg_name: "{{sg_name}}"
+      state: "present"
+      volumes:
+              - vol_id: "00AED"
+      vol_state: "absent-in-group"
+    loop: "{{all_volumes_Id}}"
+  
+  - name : Get volume details
+    register: temp_result
+    dellemc_powermax_volume:
+      unispherehost: "{{unispherehost}}"
+      universion: "{{universion}}"
+      verifycert: "{{verifycert}}"
+      user: "{{user}}"
+      password: "{{password}}"
+      serial_no: "{{serial_no}}"
+      vol_id: "{{item}}"
+      sg_name: "{{sg_name}}"
+      state: 'absent-in-group'
+    loop: "{{ all_volumes_Id }}"
+
+  - set_fact:
+      all_volumes_names: "{{ temp_result['results'] | map(attribute='volume_details.volume_identifier') | list }}"
+
+  - name : Delete all the volumes
+    dellemc_powermax_volume:
+      unispherehost: "{{unispherehost}}"
+      universion: "{{universion}}"
+      verifycert: "{{verifycert}}"
+      user: "{{user}}"
+      password: "{{password}}"
+      serial_no: "{{serial_no}}"
+      vol_id: "{item}}"
+      state: "absent" 
+    loop: "{{ all_volumes_Id }}"
+
