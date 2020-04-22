@@ -2,24 +2,26 @@
 - name: delete volume
   hosts: localhost
   connection: local
+  vars_files:
+    - vars_file/connection.yml
 
   vars:
-    unispherehost: "10.241.210.217"
-    universion: "90"
-    user: "smc"
-    password: "smc"
-    serial_no: "000197600361"
-    verifycert: false
+    sg_name: "NishuTest"
+    vol_id: "00BA8"
 
-  vars_prompt:
-    - name: "sg_name"
-      prompt: "Enter the Storage Group name"
-      private: no
-    - name: "vol_id"
-      prompt: "Enter the volume to be deleted"
-      private: no
-     
   tasks:
+  - name: Get List of orphan LUNs
+    dellemc_powermax_unmapvolume:
+      unispherehost: "{{unispherehost}}"
+      universion: "{{universion}}"
+      verifycert: "{{verifycert}}"
+      user: "{{user}}"
+      password: "{{password}}"
+      serial_no: "{{serial_no}}"
+    register: result
+
+  - debug: var=result
+
   - name: Get details of the storage group
     dellemc_powermax_storagegroup:
       unispherehost: "{{unispherehost}}"
@@ -31,9 +33,12 @@
       sg_name: "{{sg_name}}"
       state: "present"
     register: storage_details
-  
+
   - set_fact:
       all_volumes_Id : "{{storage_details.storage_group_volumes | list}}"
+  
+  - debug:
+        var:  all_volumes_Id
 
   - name : remove volumes from storage group
     dellemc_powermax_storagegroup:
@@ -48,26 +53,28 @@
       volumes:
         - vol_id: "{{vol_id}}"
       vol_state: "absent-in-group"
-    loop: "{{all_volumes_Id}}"
+
   
-  - name : Get volume details
-    register: temp_result
-    dellemc_powermax_volume:
+  - name: Get details of the storage group
+    dellemc_powermax_storagegroup:
       unispherehost: "{{unispherehost}}"
       universion: "{{universion}}"
       verifycert: "{{verifycert}}"
       user: "{{user}}"
       password: "{{password}}"
       serial_no: "{{serial_no}}"
-      vol_id: "{{vol_id}}"
       sg_name: "{{sg_name}}"
-      state: 'absent-in-group'
-    loop: "{{ all_volumes_Id }}"
+      state: "present"
+    register: storage_details
 
   - set_fact:
-      all_volumes_names: "{{ temp_result['results'] | map(attribute='volume_details.volume_identifier') | list }}"
+      volume_list_after_deletion: "{{ storage_details.storage_group_volumes | list }}"
+ 
+  - name: Printing the volume to be deleted from the storage group
+    debug:
+      msg: "{{  all_volumes_Id | difference(volume_list_after_deletion) | list }}"  
 
-  - name : Delete all the volumes
+  - name : Delete the volume from the storage Group
     dellemc_powermax_volume:
       unispherehost: "{{unispherehost}}"
       universion: "{{universion}}"
@@ -76,6 +83,8 @@
       password: "{{password}}"
       serial_no: "{{serial_no}}"
       vol_id: "{{vol_id}}"
-      state: "absent" 
+      state: "absent"
     loop: "{{ all_volumes_Id }}"
 
+  - debug:
+      msg: "volume {{ vol_id }} got deleted from  storage-group {{ sg_name }}"
