@@ -1,0 +1,8 @@
+---
+    unispherehost: "10.241.210.217"
+    universion: "90"
+    user: "smc"
+    password: "smc"
+    serial_no: "000197600361"
+    verifycert: false
+
