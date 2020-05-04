@@ -1,0 +1,78 @@
+---
+- name: delete volume
+  hosts: localhost
+  connection: local
+  vars_files:
+    - vars_file/connection.yml
+
+  vars:
+    sg_name: "NishuTest"
+    vol_id: "00BAC"
+
+  tasks:
+  - name: Get details of the storage group
+    dellemc_powermax_storagegroup:
+      unispherehost: "{{unispherehost}}"
+      universion: "{{universion}}"
+      verifycert: "{{verifycert}}"
+      user: "{{user}}"
+      password: "{{password}}"
+      serial_no: "{{serial_no}}"
+      sg_name: "{{sg_name}}"
+      state: "present"
+    register: storage_details
+
+  - set_fact:
+      all_volumes_Id : "{{storage_details.storage_group_volumes | list}}"
+  
+  - debug:
+        var:  all_volumes_Id
+
+  - name : remove volumes from storage group
+    dellemc_powermax_storagegroup:
+      unispherehost: "{{unispherehost}}"
+      universion: "{{universion}}"
+      verifycert: "{{verifycert}}"
+      user: "{{user}}"
+      password: "{{password}}"
+      serial_no: "{{serial_no}}"
+      sg_name: "{{sg_name}}"
+      state: "present"
+      volumes:
+        - vol_id: "{{vol_id}}"
+      vol_state: "absent-in-group"
+      #loop: "{{all_volumes_Id}}"
+  
+  - name: Get details of the storage group
+    dellemc_powermax_storagegroup:
+      unispherehost: "{{unispherehost}}"
+      universion: "{{universion}}"
+      verifycert: "{{verifycert}}"
+      user: "{{user}}"
+      password: "{{password}}"
+      serial_no: "{{serial_no}}"
+      sg_name: "{{sg_name}}"
+      state: "present"
+    register: storage_details
+
+  - set_fact:
+      volume_list_after_deletion: "{{ storage_details.storage_group_volumes | list }}"
+ 
+  - name: Printing the volume to be deleted from the storage group
+    debug:
+      msg: "{{  all_volumes_Id | difference(volume_list_after_deletion) | list }}"  
+
+  - name : Delete the volume from the storage Group
+    dellemc_powermax_volume:
+      unispherehost: "{{unispherehost}}"
+      universion: "{{universion}}"
+      verifycert: "{{verifycert}}"
+      user: "{{user}}"
+      password: "{{password}}"
+      serial_no: "{{serial_no}}"
+      vol_id: "{{vol_id}}"
+      state: "absent"
+    loop: "{{ all_volumes_Id }}"
+
+  - debug:
+      msg: "volume {{ vol_id }} got deleted from  storage-group {{ sg_name }}"
